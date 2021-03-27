@@ -3,37 +3,98 @@
 /*
 Default constructor for candidate.
 */
-Candidate::Candidate(){
-    this->candidate_id_ = -1;
-    this->candidate_name_ = "null";
+#include "ThingsBoard.h"
+
+#include <ESP8266WiFi.h>
+
+
+#define WIFI_AP             "*****"
+#define WIFI_PASSWORD       "*****"
+
+// See https://thingsboard.io/docs/getting-started-guides/helloworld/
+// to understand how to obtain an access token
+#define TOKEN               "8GcTC8WULFMO3KqEj31T"
+#define THINGSBOARD_SERVER  "demo.thingsboard.io"
+
+// Baud rate for debug serial
+#define SERIAL_DEBUG_BAUD   115200
+
+// Initialize ThingsBoard client
+WiFiClient espClient;
+// Initialize ThingsBoard instance
+ThingsBoard tb(espClient);
+// the Wifi radio's status
+int status = WL_IDLE_STATUS;
+
+//analog input output pins and initializing sensor value
+const int analogInPin = A0;
+int sensorValue = 0;
+
+
+void setup() {
+  // initialize serial for debugging
+  Serial.begin(SERIAL_DEBUG_BAUD);
+  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+  InitWiFi();
 }
 
-/*
-Overloaded candidate constructor, assigns given id, name and party
-*/
-Candidate::Candidate(int id, std::string name, Party p){
-    this->candidate_id_ = id;
-    this->candidate_name_ = name;
-    this->candidate_party_ = p;
+void loop() {
+  delay(1000);
+
+  if (WiFi.status() != WL_CONNECTED) {
+    reconnect();
+  }
+
+  if (!tb.connected()) {
+    // Connect to the ThingsBoard
+    Serial.print("Connecting to: ");
+    Serial.print(THINGSBOARD_SERVER);
+    Serial.print(" with token ");
+    Serial.println(TOKEN);
+    if (!tb.connect(THINGSBOARD_SERVER, TOKEN)) {
+      Serial.println("Failed to connect");
+      return;
+    }
+  }
+
+  //updates sensor value
+  sensorValue = analogRead(analogInPin);
+  Serial.print("sensor = ");
+  Serial.println(sensorValue);
+  delay(3000); 
+  Serial.println("Sending data...");
+
+  // Uploads new telemetry to ThingsBoard using MQTT.
+  // See https://thingsboard.io/docs/reference/mqtt-api/#telemetry-upload-api
+  // for more details
+
+  tb.sendTelemetryInt("LDR data", sensorValue);
+
+  tb.loop();
 }
 
-/*
-getter method for candidate id
-*/
-int Candidate::getCandidateID(){
-    return this->candidate_id_;
+void InitWiFi()
+{
+  Serial.println("Connecting to AP ...");
+  // attempt to connect to WiFi network
+
+  WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("Connected to AP");
 }
 
-/*
-getter method for candidate name
-*/
-std::string Candidate::getCandidateName(){
-    return this->candidate_name_;
-}
-
-/*
-getter method for candidate party
-*/
-Party Candidate::getCandidateParty(){
-    return this->candidate_party_;
+void reconnect() {
+  // Loop until we're reconnected
+  status = WiFi.status();
+  if ( status != WL_CONNECTED) {
+    WiFi.begin(WIFI_AP, WIFI_PASSWORD);
+    while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+    }
+    Serial.println("Connected to AP");
+  }
 }
